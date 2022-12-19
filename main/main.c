@@ -17,7 +17,7 @@
 #define WIFI_CHANNEL_SWITCH_INTERVAL  (500)
 #define WIFI_CHANNEL_MAX               (13)
 SSD1306_t dev;
-
+bool screen_is_used = false;
 uint8_t level = 0, channel = 1;
 
 static wifi_country_t wifi_country = {.cc="CN", .schan = 1, .nchan = 13};
@@ -85,7 +85,9 @@ void wifi_sniffer_packet_handler(void* buff, wifi_promiscuous_pkt_type_t type)
   //  return;
 
   
- 
+ if (screen_is_used){
+  return;
+ } 
 
   const wifi_promiscuous_pkt_t *ppkt = (wifi_promiscuous_pkt_t *)buff;
   const wifi_ieee80211_packet_t *ipkt = (wifi_ieee80211_packet_t *)ppkt->payload;
@@ -99,7 +101,7 @@ if (hdr->addr2[0]==hdr->addr3[0] &&
   hdr->addr2[5]==hdr->addr3[5]) {
     return;
   }
-
+  screen_is_used = true;  
   ssd1306_clear_screen(&dev, false);
   char str[100];
   sprintf(str, "%02x:%02x:%02x:%02x:%02x:%02x", 
@@ -124,7 +126,7 @@ sprintf(str, "%02x:%02x:%02x:%02x:%02x:%02x",
  sprintf(str, "Channel: %02d", 
   ppkt->rx_ctrl.channel);
   ssd1306_display_text(&dev, 4, str, strlen(str), false);
-
+screen_is_used = false;
   printf("PACKET TYPE=%s, CHAN=%02d, RSSI=%02d,"
     " ADDR1=%02x:%02x:%02x:%02x:%02x:%02x,"
     " ADDR2=%02x:%02x:%02x:%02x:%02x:%02x,"
@@ -149,18 +151,19 @@ void button_check(void *p){
   for ( ; ; )
   {
   
-  if (gpio_get_level(GPIO_NUM_0)==0){
-      
+    if (gpio_get_level(GPIO_NUM_0)==0 && !screen_is_used){
 
-    channel = (channel % WIFI_CHANNEL_MAX) + 1;
-    printf("CHANGING CHANNEL TO %i \n", channel);
-    wifi_sniffer_set_channel(channel);
-    char str[100];
-    sprintf(str, "SET CHANNEL #%i", channel);
-    //ssd1306_clear_screen(&dev, false);
-    ssd1306_display_text(&dev, 5, str, strlen(str), false);
-    
-  }
+      screen_is_used = true;
+      channel = (channel % WIFI_CHANNEL_MAX) + 1;
+      printf("CHANGING CHANNEL TO %i \n", channel);
+      wifi_sniffer_set_channel(channel);
+      char str[100];
+      sprintf(str, "SET CHANNEL #%i", channel);
+      //ssd1306_clear_screen(&dev, false);
+      ssd1306_display_text(&dev, 5, str, strlen(str), false);
+      screen_is_used = false;
+
+    }
     vTaskDelay(300);
 
   }
